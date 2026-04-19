@@ -347,6 +347,13 @@ nav {
   margin-bottom: 0;
 }
 
+.project-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .small-button {
   min-height: 32px;
   padding: 5px 9px;

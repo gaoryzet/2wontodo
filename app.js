@@ -29,6 +29,7 @@ const state = {
   activeView: savedUi.activeView || "dashboard",
   activeCategory: savedUi.activeCategory || "all",
   calendarDate: savedUi.calendarDate || new Date().toISOString(),
+  editingProjectId: "",
   users: [],
   projects: [],
   schedules: [],
@@ -57,6 +58,8 @@ const els = {
   userList: document.getElementById("userList"),
   projectModal: document.getElementById("projectModal"),
   projectForm: document.getElementById("projectForm"),
+  projectModalTitle: document.getElementById("projectModalTitle"),
+  projectSubmitButton: document.getElementById("projectSubmitButton"),
   openProjectModal: document.getElementById("openProjectModal"),
   closeProjectModal: document.getElementById("closeProjectModal"),
   detailScheduleBox: document.getElementById("detailScheduleBox"),
@@ -367,7 +370,7 @@ function scheduleTone(schedule) {
   if (schedule.status === "completed") {
     return { ...scheduleTones.later, label: "완료" };
   }
-  const days = daysUntil(schedule.startDate);
+  const days = daysUntil(schedule.endDate);
   if (days <= 3) return scheduleTones.urgent;
   if (days <= 7) return scheduleTones.starting;
   if (days <= 14) return scheduleTones.relaxed;
@@ -469,7 +472,10 @@ function renderDashboard() {
           <div class="project-meta">${project.startDate} - ${project.endDate} · ${dDay(project.startDate)}</div>
           <div class="project-title-row">
             <h3>${project.name}</h3>
-            <button class="ghost-button danger-button small-button" data-action="deleteProject" data-id="${project.id}" type="button">삭제</button>
+            <div class="project-card-actions">
+              <button class="ghost-button small-button" data-action="editProject" data-id="${project.id}" type="button">수정</button>
+              <button class="ghost-button danger-button small-button" data-action="deleteProject" data-id="${project.id}" type="button">삭제</button>
+            </div>
           </div>
           <div class="project-tags">
             <span class="status-pill">${projectTypes[project.type]}</span>
@@ -592,6 +598,60 @@ function addDetailRow(values = {}) {
   els.detailRows.appendChild(row);
 }
 
+function resetProjectModalForCreate() {
+  state.editingProjectId = "";
+  els.projectForm.reset();
+  els.projectModalTitle.textContent = "프로젝트 등록";
+  els.projectSubmitButton.textContent = "프로젝트 등록";
+  els.projectForm.type.value = "single";
+  els.projectForm.color.value = "#176d6b";
+  els.projectForm.category.value = "branding";
+  els.projectForm.startDate.value = offsetDate(1);
+  els.projectForm.endDate.value = offsetDate(14);
+  els.detailRows.innerHTML = "";
+  addDetailRow({ phase: "로고", title: "로고 1차 시안", startDate: offsetDate(1), endDate: offsetDate(3), category: "branding" });
+  addDetailRow({ phase: "매뉴얼 제작", title: "브랜드 매뉴얼 제작", startDate: offsetDate(4), endDate: offsetDate(8), category: "branding" });
+  addDetailRow({ phase: "패키지 제작", title: "패키지 시안 제작", startDate: offsetDate(9), endDate: offsetDate(14), category: "branding" });
+  els.detailScheduleBox.style.display = "none";
+}
+
+function openProjectEditModal(projectId) {
+  const project = byId(state.projects, projectId);
+  if (!project) return;
+  state.editingProjectId = projectId;
+  els.projectForm.reset();
+  els.projectModalTitle.textContent = "프로젝트 수정";
+  els.projectSubmitButton.textContent = "수정 후 등록";
+  els.projectForm.name.value = project.name;
+  els.projectForm.clientName.value = project.clientName;
+  els.projectForm.color.value = project.color;
+  els.projectForm.type.value = project.type;
+  els.projectForm.category.value = project.category;
+  els.projectForm.startDate.value = project.startDate;
+  els.projectForm.endDate.value = project.endDate;
+  els.projectForm.status.value = project.status;
+  els.detailRows.innerHTML = "";
+  state.schedules
+    .filter((schedule) => schedule.projectId === projectId)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .forEach((schedule) => {
+      addDetailRow({
+        phase: schedule.phase,
+        title: schedule.title,
+        startDate: schedule.startDate,
+        endDate: schedule.endDate,
+        category: schedule.category,
+        assigneeUserId: schedule.assigneeUserId,
+        content: schedule.content,
+      });
+    });
+  if (project.type === "complex" && els.detailRows.children.length === 0) {
+    addDetailRow({ category: project.category });
+  }
+  els.detailScheduleBox.style.display = project.type === "complex" ? "block" : "none";
+  els.projectModal.showModal();
+}
+
 function collectDetailRows(projectId, clientName) {
   return [...els.detailRows.querySelectorAll(".detail-row")]
     .map((row) => ({
@@ -655,6 +715,57 @@ async function addProjectFromForm(form) {
       body: JSON.stringify(schedules.map(scheduleToDb)),
     });
   }
+  await loadData();
+}
+
+async function updateProjectFromForm(form, projectId) {
+  const formData = new FormData(form);
+  const type = formData.get("type");
+  const project = {
+    name: formData.get("name"),
+    clientName: formData.get("clientName"),
+    color: formData.get("color"),
+    type,
+    category: formData.get("category"),
+    startDate: formData.get("startDate"),
+    endDate: formData.get("endDate"),
+    status: formData.get("status"),
+  };
+
+  await supabaseRequest(`projects?id=eq.${projectId}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify(projectToDb(project)),
+  });
+
+  await supabaseRequest(`schedules?project_id=eq.${projectId}`, { method: "DELETE" });
+
+  const schedules =
+    type === "single"
+      ? [
+          {
+            projectId,
+            phase: "단발 프로젝트",
+            title: project.name,
+            clientName: project.clientName,
+            content: `${project.name} 단발 프로젝트`,
+            startDate: project.startDate,
+            endDate: project.endDate,
+            category: project.category,
+            status: project.status,
+            assigneeUserId: state.currentUserId || state.users[0]?.id || null,
+          },
+        ]
+      : collectDetailRows(projectId, project.clientName);
+
+  if (schedules.length > 0) {
+    await supabaseRequest("schedules", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(schedules.map(scheduleToDb)),
+    });
+  }
+  state.editingProjectId = "";
   await loadData();
 }
 
@@ -730,6 +841,9 @@ document.addEventListener("click", async (event) => {
     if (action === "deleteProject") {
       await deleteProject(id);
     }
+    if (action === "editProject") {
+      openProjectEditModal(id);
+    }
     if (action === "removeUser") {
       await removeUser(id);
     }
@@ -751,21 +865,12 @@ document.addEventListener("click", async (event) => {
 });
 
 els.openProjectModal.addEventListener("click", () => {
-  els.projectForm.reset();
-  els.projectForm.type.value = "single";
-  els.projectForm.color.value = "#176d6b";
-  els.projectForm.category.value = "branding";
-  els.projectForm.startDate.value = offsetDate(1);
-  els.projectForm.endDate.value = offsetDate(14);
-  els.detailRows.innerHTML = "";
-  addDetailRow({ phase: "로고", title: "로고 1차 시안", startDate: offsetDate(1), endDate: offsetDate(3), category: "branding" });
-  addDetailRow({ phase: "매뉴얼 제작", title: "브랜드 매뉴얼 제작", startDate: offsetDate(4), endDate: offsetDate(8), category: "branding" });
-  addDetailRow({ phase: "패키지 제작", title: "패키지 시안 제작", startDate: offsetDate(9), endDate: offsetDate(14), category: "branding" });
-  els.detailScheduleBox.style.display = "none";
+  resetProjectModalForCreate();
   els.projectModal.showModal();
 });
 
 els.closeProjectModal.addEventListener("click", () => {
+  state.editingProjectId = "";
   els.projectModal.close();
 });
 
@@ -785,7 +890,11 @@ els.addDetailRow.addEventListener("click", () => addDetailRow());
 els.projectForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    await addProjectFromForm(els.projectForm);
+    if (state.editingProjectId) {
+      await updateProjectFromForm(els.projectForm, state.editingProjectId);
+    } else {
+      await addProjectFromForm(els.projectForm);
+    }
     els.projectModal.close();
   } catch (error) {
     alert("프로젝트 저장 중 오류가 발생했습니다.");
