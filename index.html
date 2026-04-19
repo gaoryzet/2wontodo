@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>이원 TODO</title>
+    <meta name="theme-color" content="#176d6b" />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="./assets/icon.svg" />
+    <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Collaborative schedule desk</p>
+        <h1>이원 TODO</h1>
+      </div>
+      <div class="header-actions">
+        <label class="user-switcher" aria-label="현재 사용자">
+          <span class="user-icon" aria-hidden="true"></span>
+          <select id="currentUserSelect"></select>
+        </label>
+        <button class="primary-button" id="openProjectModal">+ 프로젝트 등록</button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <aside class="sidebar">
+        <nav aria-label="주요 화면">
+          <button class="nav-item active" data-view="dashboard">프로젝트</button>
+          <button class="nav-item" data-view="calendar">캘린더</button>
+          <button class="nav-item" data-view="categories">카테고리 리스트</button>
+          <button class="nav-item" data-view="users">사용자</button>
+        </nav>
+        <section class="quick-panel">
+          <h2>일정 색상</h2>
+          <div class="legend"><span class="dot urgent"></span>3일 이내 · 가장 급함</div>
+          <div class="legend"><span class="dot medium"></span>7일 이내 · 시작단계</div>
+          <div class="legend"><span class="dot relaxed"></span>2주 이내 · 여유있음</div>
+          <div class="legend"><span class="dot low"></span>그 이상 · 여유 일정</div>
+        </section>
+      </aside>
+
+      <section class="content">
+        <section class="toolbar">
+          <div>
+            <p class="eyebrow" id="viewEyebrow">Project overview</p>
+            <h2 id="viewTitle">프로젝트별 세부 일정</h2>
+          </div>
+          <div class="filters">
+            <select id="projectFilter" aria-label="프로젝트 필터"></select>
+            <select id="userFilter" aria-label="사용자 필터"></select>
+            <select id="categoryFilter" aria-label="카테고리 필터"></select>
+            <select id="statusFilter" aria-label="상태 필터">
+              <option value="all">전체 상태</option>
+              <option value="pending">미완료</option>
+              <option value="completed">완료</option>
+            </select>
+          </div>
+        </section>
+
+        <section id="dashboardView" class="view active-view">
+          <div class="summary-grid" id="summaryGrid"></div>
+          <div class="project-grid" id="projectGrid"></div>
+        </section>
+
+        <section id="calendarView" class="view">
+          <div class="calendar-head">
+            <button class="ghost-button" id="prevMonth">이전</button>
+            <h3 id="calendarTitle"></h3>
+            <button class="ghost-button" id="nextMonth">다음</button>
+          </div>
+          <div class="calendar-grid calendar-weekdays">
+            <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+        </section>
+
+        <section id="categoriesView" class="view">
+          <div class="category-tabs" id="categoryTabs"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>날짜</th>
+                  <th>클라이언트</th>
+                  <th>내용</th>
+                  <th>프로젝트</th>
+                  <th>세부 항목</th>
+                  <th>담당자</th>
+                  <th>상태</th>
+                </tr>
+              </thead>
+              <tbody id="categoryTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="usersView" class="view">
+          <div class="notice">
+            팀원을 등록하거나 제거할 수 있습니다. 현재 선택된 사용자는 본인 계정에서 팀원 탈퇴를 할 수 있습니다.
+          </div>
+          <form class="inline-form" id="userForm">
+            <input name="name" placeholder="사용자 이름" required />
+            <input name="email" placeholder="이메일" type="email" required />
+            <button class="primary-button" type="submit">팀원 등록</button>
+          </form>
+          <div id="userList" class="user-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="projectModal">
+      <form method="dialog" class="modal-card" id="projectForm">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">New project</p>
+            <h2>프로젝트 등록</h2>
+          </div>
+          <button class="icon-button" id="closeProjectModal" type="button" aria-label="닫기">×</button>
+        </div>
+        <div class="type-selector" role="radiogroup" aria-label="프로젝트 유형">
+          <label><input type="radio" name="type" value="single" checked /> 단발 프로젝트</label>
+          <label><input type="radio" name="type" value="complex" /> 복합 프로젝트</label>
+        </div>
+        <div class="form-grid">
+          <label>프로젝트명<input name="name" placeholder="예: A브랜드 리뉴얼" required /></label>
+          <label>클라이언트<input name="clientName" placeholder="예: A브랜드" required /></label>
+          <label>시작일<input name="startDate" type="date" required /></label>
+          <label>종료일<input name="endDate" type="date" required /></label>
+          <label>카테고리
+            <select name="category">
+              <option value="illustration">일러스트</option>
+              <option value="branding" selected>브랜딩</option>
+              <option value="order">발주</option>
+              <option value="etc">기타</option>
+            </select>
+          </label>
+          <label>대표 색상<input name="color" type="color" value="#176d6b" /></label>
+          <label>상태<select name="status"><option value="pending">진행중</option><option value="completed">완료</option></select></label>
+        </div>
+        <section class="detail-schedule-box" id="detailScheduleBox">
+          <div class="detail-schedule-head">
+            <div>
+              <h3>복합 프로젝트 세부 일정</h3>
+              <p class="small-muted">로고, 매뉴얼 제작, 패키지 제작처럼 각각의 시작일과 종료일을 등록합니다.</p>
+            </div>
+            <button class="ghost-button" type="button" id="addDetailRow">+ 세부 일정</button>
+          </div>
+          <div id="detailRows" class="detail-rows"></div>
+        </section>
+        <button class="primary-button wide" type="submit">프로젝트 등록</button>
+      </form>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
