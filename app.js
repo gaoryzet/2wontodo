@@ -50,6 +50,7 @@ const els = {
   summaryGrid: document.getElementById("summaryGrid"),
   projectGrid: document.getElementById("projectGrid"),
   calendarGrid: document.getElementById("calendarGrid"),
+  mobileCalendarList: document.getElementById("mobileCalendarList"),
   calendarTitle: document.getElementById("calendarTitle"),
   prevMonth: document.getElementById("prevMonth"),
   nextMonth: document.getElementById("nextMonth"),
@@ -514,27 +515,39 @@ function renderCalendar() {
   start.setDate(first.getDate() - first.getDay());
 
   const days = [];
+  const mobileDays = [];
   for (let index = 0; index < 42; index += 1) {
     const day = new Date(start);
     day.setDate(start.getDate() + index);
     const key = day.toISOString().slice(0, 10);
     const events = filteredSchedules().filter((schedule) => key >= schedule.startDate && key <= schedule.endDate);
+    const eventHtml = events.map((schedule) => calendarEventHtml(schedule)).join("");
     days.push(`<div class="calendar-day ${day.getMonth() === month ? "" : "muted-day"}">
       <span class="calendar-date">${day.getDate()}</span>
-      ${events
-        .map((schedule) => {
-          const project = byId(state.projects, schedule.projectId);
-          const tone = scheduleTone(schedule);
-          return `<span class="calendar-event" style="background:${tone.color}; color:${tone.text || "#ffffff"}">
-            <span class="project-color-chip" style="background:${project?.color || "#ffffff"}"></span>
-            <span class="calendar-event-text">${schedule.title}</span>
-            <small>${project?.name || ""} · ${schedule.phase}</small>
-          </span>`;
-        })
-        .join("")}
+      ${eventHtml}
     </div>`);
+    if (day.getMonth() === month && events.length > 0) {
+      mobileDays.push(`<section class="mobile-calendar-day">
+        <div class="mobile-date">
+          <strong>${month + 1}월 ${day.getDate()}일</strong>
+          <span>${["일", "월", "화", "수", "목", "금", "토"][day.getDay()]}</span>
+        </div>
+        <div class="mobile-events">${eventHtml}</div>
+      </section>`);
+    }
   }
   els.calendarGrid.innerHTML = days.join("");
+  els.mobileCalendarList.innerHTML = mobileDays.join("") || `<p class="small-muted">이번 달 표시할 일정이 없습니다.</p>`;
+}
+
+function calendarEventHtml(schedule) {
+  const project = byId(state.projects, schedule.projectId);
+  const tone = scheduleTone(schedule);
+  return `<span class="calendar-event" style="background:${tone.color}; color:${tone.text || "#ffffff"}">
+    <span class="project-color-chip" style="background:${project?.color || "#ffffff"}"></span>
+    <span class="calendar-event-text">${schedule.title}</span>
+    <small>${project?.name || ""} · ${schedule.phase}</small>
+  </span>`;
 }
 
 function renderCategories() {
