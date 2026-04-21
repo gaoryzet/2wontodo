@@ -1,6 +1,7 @@
 const SUPABASE_URL = "https://jagbzzjmtxugdbuhjbij.supabase.co";
 const SUPABASE_KEY = "sb_publishable_SsA8yT__1nGHdEUHshfLVw_5RCq_5cU";
 const UI_STORAGE_KEY = "ewonTodo.ui.v1";
+const AUTH_STORAGE_KEY = "ewonTodo.auth.v1";
 
 const categories = {
   illustration: "일러스트",
@@ -24,7 +25,9 @@ const projectTypes = {
 const profileColors = ["#176d6b", "#d9413a", "#3e8f55", "#6f5e96"];
 
 const savedUi = readSavedUi();
+const savedAuth = readSavedAuth();
 const state = {
+  session: savedAuth.session || null,
   currentUserId: savedUi.currentUserId || "",
   activeView: savedUi.activeView || "dashboard",
   activeCategory: savedUi.activeCategory || "all",
@@ -38,6 +41,10 @@ const state = {
 };
 
 const els = {
+  authScreen: document.getElementById("authScreen"),
+  authForm: document.getElementById("authForm"),
+  authMessage: document.getElementById("authMessage"),
+  logoutButton: document.getElementById("logoutButton"),
   navItems: document.querySelectorAll(".nav-item"),
   views: document.querySelectorAll(".view"),
   viewTitle: document.getElementById("viewTitle"),
@@ -84,6 +91,14 @@ function readSavedUi() {
   }
 }
 
+function readSavedAuth() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
 function saveUi() {
   localStorage.setItem(
     UI_STORAGE_KEY,
@@ -94,6 +109,98 @@ function saveUi() {
       calendarDate: state.calendarDate,
     })
   );
+}
+
+function saveAuth() {
+  if (!state.session) {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ session: state.session }));
+}
+
+function isSignedIn() {
+  return Boolean(state.session?.access_token);
+}
+
+function setAuthVisibility() {
+  const locked = !isSignedIn();
+  document.body.classList.toggle("is-locked", locked);
+  els.authScreen?.classList.toggle("active", locked);
+}
+
+async function authRequest(path, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_KEY,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { error: text };
+  }
+  if (!response.ok) {
+    throw new Error(data?.msg || data?.error_description || data?.error || "로그인에 실패했습니다.");
+  }
+  return data;
+}
+
+async function signIn(email, password) {
+  els.authMessage.textContent = "로그인 확인 중입니다...";
+  const data = await authRequest("token?grant_type=password", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  state.session = {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    user: data.user,
+  };
+  saveAuth();
+  setAuthVisibility();
+  await loadData();
+}
+
+async function refreshSession() {
+  if (!state.session?.refresh_token) return false;
+  try {
+    const data = await authRequest("token?grant_type=refresh_token", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: state.session.refresh_token }),
+    });
+    state.session = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      user: data.user,
+    };
+    saveAuth();
+    return true;
+  } catch {
+    state.session = null;
+    saveAuth();
+    return false;
+  }
+}
+
+function signOut() {
+  state.session = null;
+  state.users = [];
+  state.projects = [];
+  state.schedules = [];
+  state.loading = false;
+  state.error = "";
+  saveAuth();
+  setAuthVisibility();
+  if (els.authMessage) {
+    els.authMessage.textContent = "로그아웃되었습니다. 다시 로그인하면 개인 일정을 볼 수 있습니다.";
+  }
 }
 
 function offsetDate(days) {
@@ -190,7 +297,7 @@ async function supabaseRequest(path, options = {}) {
     ...options,
     headers: {
       apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
+      Authorization: `Bearer ${state.session?.access_token || SUPABASE_KEY}`,
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
@@ -198,6 +305,9 @@ async function supabaseRequest(path, options = {}) {
 
   if (!response.ok) {
     const message = await response.text();
+    if (response.status === 401 || response.status === 403) {
+      signOut();
+    }
     throw new Error(message || `Supabase request failed: ${response.status}`);
   }
 
@@ -207,6 +317,11 @@ async function supabaseRequest(path, options = {}) {
 }
 
 async function loadData() {
+  if (!isSignedIn()) {
+    state.loading = false;
+    setAuthVisibility();
+    return;
+  }
   state.loading = true;
   state.error = "";
   render();
@@ -379,6 +494,8 @@ function scheduleTone(schedule) {
 }
 
 function render() {
+  setAuthVisibility();
+  if (!isSignedIn()) return;
   saveUi();
   renderControls();
   renderView();
@@ -563,13 +680,13 @@ function renderCategories() {
       const project = byId(state.projects, schedule.projectId);
       const assignee = byId(state.users, schedule.assigneeUserId);
       return `<tr>
-        <td>${schedule.startDate} - ${schedule.endDate}<br><span class="small-muted">${dDay(schedule.startDate)}</span></td>
-        <td>${schedule.clientName}</td>
-        <td><strong>${schedule.title}</strong><br><span class="small-muted">${schedule.content}</span></td>
-        <td>${project?.name || "미지정"}</td>
-        <td>${schedule.phase}</td>
-        <td>${assignee?.name || "미지정"}</td>
-        <td><span class="status-pill">${schedule.status === "completed" ? "완료" : "미완료"}</span></td>
+        <td data-label="날짜">${schedule.startDate} - ${schedule.endDate}<br><span class="small-muted">${dDay(schedule.startDate)}</span></td>
+        <td data-label="클라이언트">${schedule.clientName}</td>
+        <td data-label="내용"><strong>${schedule.title}</strong><br><span class="small-muted">${schedule.content}</span></td>
+        <td data-label="프로젝트">${project?.name || "미지정"}</td>
+        <td data-label="세부 항목">${schedule.phase}</td>
+        <td data-label="담당자">${assignee?.name || "미지정"}</td>
+        <td data-label="상태"><span class="status-pill">${schedule.status === "completed" ? "완료" : "미완료"}</span></td>
       </tr>`;
     })
     .join("");
@@ -938,6 +1055,20 @@ els.userForm.addEventListener("submit", async (event) => {
   }
 });
 
+els.authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(els.authForm);
+  try {
+    await signIn(formData.get("email"), formData.get("password"));
+    els.authForm.password.value = "";
+  } catch (error) {
+    els.authMessage.textContent = error.message || "로그인에 실패했습니다.";
+    console.error(error);
+  }
+});
+
+els.logoutButton.addEventListener("click", signOut);
+
 els.currentUserSelect.addEventListener("change", (event) => {
   state.currentUserId = event.target.value;
   saveUi();
@@ -973,4 +1104,15 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   });
 }
 
-loadData();
+async function initApp() {
+  setAuthVisibility();
+  if (!isSignedIn()) return;
+  await refreshSession();
+  if (isSignedIn()) {
+    await loadData();
+  } else {
+    setAuthVisibility();
+  }
+}
+
+initApp();

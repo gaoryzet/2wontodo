@@ -25,6 +25,44 @@ body {
   background: var(--paper);
 }
 
+body.is-locked .app-header,
+body.is-locked .app-shell {
+  display: none;
+}
+
+.auth-screen {
+  display: none;
+  min-height: 100vh;
+  padding: 28px;
+  place-items: center;
+  background: linear-gradient(135deg, #eef1ed 0%, #ffffff 100%);
+}
+
+.auth-screen.active {
+  display: grid;
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.auth-card label {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.auth-copy {
+  color: var(--muted);
+}
+
 button,
 input,
 select,
@@ -491,7 +529,8 @@ nav {
   border-radius: 8px;
   color: #ffffff;
   font-size: 12px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .project-color-chip {
@@ -845,6 +884,11 @@ dialog::backdrop {
     padding: 9px 10px;
   }
 
+  .mobile-calendar-list .calendar-event-text,
+  .mobile-calendar-list .calendar-event small {
+    line-height: 1.45;
+  }
+
   .calendar-day {
     min-height: 104px;
     padding: 7px;
@@ -856,5 +900,52 @@ dialog::backdrop {
 
   .detail-content {
     grid-column: auto;
+  }
+
+  .table-wrap {
+    overflow: visible;
+    background: transparent;
+    border: 0;
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tr {
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #ffffff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid #eef0ee;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  td:last-child {
+    border-bottom: 0;
   }
 }

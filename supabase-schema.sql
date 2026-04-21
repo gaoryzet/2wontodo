@@ -42,28 +42,40 @@ drop policy if exists "public read app_users" on app_users;
 drop policy if exists "public insert app_users" on app_users;
 drop policy if exists "public update app_users" on app_users;
 drop policy if exists "public delete app_users" on app_users;
+drop policy if exists "owner read app_users" on app_users;
+drop policy if exists "owner insert app_users" on app_users;
+drop policy if exists "owner update app_users" on app_users;
+drop policy if exists "owner delete app_users" on app_users;
 
 drop policy if exists "public read projects" on projects;
 drop policy if exists "public insert projects" on projects;
 drop policy if exists "public update projects" on projects;
 drop policy if exists "public delete projects" on projects;
+drop policy if exists "owner read projects" on projects;
+drop policy if exists "owner insert projects" on projects;
+drop policy if exists "owner update projects" on projects;
+drop policy if exists "owner delete projects" on projects;
 
 drop policy if exists "public read schedules" on schedules;
 drop policy if exists "public insert schedules" on schedules;
 drop policy if exists "public update schedules" on schedules;
 drop policy if exists "public delete schedules" on schedules;
+drop policy if exists "owner read schedules" on schedules;
+drop policy if exists "owner insert schedules" on schedules;
+drop policy if exists "owner update schedules" on schedules;
+drop policy if exists "owner delete schedules" on schedules;
 
-create policy "public read app_users" on app_users for select to anon using (true);
-create policy "public insert app_users" on app_users for insert to anon with check (true);
-create policy "public update app_users" on app_users for update to anon using (true) with check (true);
-create policy "public delete app_users" on app_users for delete to anon using (true);
+create policy "owner read app_users" on app_users for select to authenticated using (auth.jwt() ->> 'email' = 'zzummm@naver.com');
+create policy "owner insert app_users" on app_users for insert to authenticated with check (auth.jwt() ->> 'email' = 'zzummm@naver.com');
+create policy "owner update app_users" on app_users for update to authenticated using (auth.jwt() ->> 'email' = 'zzummm@naver.com') with check (auth.jwt() ->> 'email' = 'zzummm@naver.com');
+create policy "owner delete app_users" on app_users for delete to authenticated using (auth.jwt() ->> 'email' = 'zzummm@naver.com');
 
-create policy "public read projects" on projects for select to anon using (true);
-create policy "public insert projects" on projects for insert to anon with check (true);
-create policy "public update projects" on projects for update to anon using (true) with check (true);
-create policy "public delete projects" on projects for delete to anon using (true);
+create policy "owner read projects" on projects for select to authenticated using (auth.jwt() ->> 'email' = 'zzummm@naver.com');
+create policy "owner insert projects" on projects for insert to authenticated with check (auth.jwt() ->> 'email' = 'zzummm@naver.com');
+create policy "owner update projects" on projects for update to authenticated using (auth.jwt() ->> 'email' = 'zzummm@naver.com') with check (auth.jwt() ->> 'email' = 'zzummm@naver.com');
+create policy "owner delete projects" on projects for delete to authenticated using (auth.jwt() ->> 'email' = 'zzummm@naver.com');
 
-create policy "public read schedules" on schedules for select to anon using (true);
-create policy "public insert schedules" on schedules for insert to anon with check (true);
-create policy "public update schedules" on schedules for update to anon using (true) with check (true);
-create policy "public delete schedules" on schedules for delete to anon using (true);
+create policy "owner read schedules" on schedules for select to authenticated using (auth.jwt() ->> 'email' = 'zzummm@naver.com');
+create policy "owner insert schedules" on schedules for insert to authenticated with check (auth.jwt() ->> 'email' = 'zzummm@naver.com');
+create policy "owner update schedules" on schedules for update to authenticated using (auth.jwt() ->> 'email' = 'zzummm@naver.com') with check (auth.jwt() ->> 'email' = 'zzummm@naver.com');
+create policy "owner delete schedules" on schedules for delete to authenticated using (auth.jwt() ->> 'email' = 'zzummm@naver.com');

@@ -1,4 +1,4 @@
-const CACHE_NAME = "ewon-todo-v1";
+const CACHE_NAME = "ewon-todo-v2";
 const APP_ASSETS = [
   "./",
   "./index.html",
